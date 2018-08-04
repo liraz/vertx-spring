@@ -13,38 +13,46 @@ import io.vertx.ext.web.Router;
  */
 public class SpringHttpVerticle extends AbstractVerticle {
 
-  private ContextFactory factory;
+    private ContextFactory factory;
 
-  private ApplicationContext applicationContext;
+    private ApplicationContext applicationContext;
 
-  private HttpServerOptions options;
+    private HttpServerOptions options;
 
-  public SpringHttpVerticle(ContextFactory factory, HttpServerOptions options) {
-    this.factory = factory;
-    this.options = options;
-  }
+    public SpringHttpVerticle(ApplicationContext applicationContext, HttpServerOptions options) {
+        this.applicationContext = applicationContext;
+        this.options = options;
+    }
 
-  @Override
-  public void start(Future<Void> startFuture) throws Exception {
-    vertx.executeBlocking((f) -> {
-      try {
-        VertxHolder.set(getVertx());
-        applicationContext = factory.create();
-        f.complete(applicationContext);
-      } catch (Exception e) {
-        f.fail(e);
-      }
-    }, (ar) -> {
-      if (ar.failed()) {
-        startFuture.fail(ar.cause());
-      } else {
-        Router router = applicationContext.getBean(Router.class);
-        vertx.createHttpServer(options)
-          .requestHandler(router::accept)
-          .listen();
-        startFuture.complete(null);
-      }
-    });
-  }
+    public SpringHttpVerticle(ContextFactory factory, HttpServerOptions options) {
+        this.factory = factory;
+        this.options = options;
+    }
+
+    @Override
+    public void start(Future<Void> startFuture) throws Exception {
+        vertx.executeBlocking((f) -> {
+            try {
+                VertxHolder.set(getVertx());
+
+                if (factory != null && applicationContext == null) {
+                    applicationContext = factory.create();
+                }
+                f.complete(applicationContext);
+            } catch (Exception e) {
+                f.fail(e);
+            }
+        }, (ar) -> {
+            if (ar.failed()) {
+                startFuture.fail(ar.cause());
+            } else {
+                Router router = applicationContext.getBean(Router.class);
+                vertx.createHttpServer(options)
+                        .requestHandler(router::accept)
+                        .listen();
+                startFuture.complete(null);
+            }
+        });
+    }
 
 }
