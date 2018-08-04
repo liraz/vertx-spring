@@ -26,7 +26,7 @@ public class RedisClientFactory implements FactoryBean<RedisClient> {
 
   @Override
   public RedisClient getObject() throws Exception {
-    return RedisClient.create(vertx, new RedisOptions()
+    return RedisClient.create(vertx, (RedisOptions) new RedisOptions()
       .setHost(host)
       .setPort(port)
       .setTcpKeepAlive(true)
