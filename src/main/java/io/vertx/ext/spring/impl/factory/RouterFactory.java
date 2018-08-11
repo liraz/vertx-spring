@@ -1,10 +1,12 @@
 package io.vertx.ext.spring.impl.factory;
 
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
+import io.vertx.core.json.Json;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.auth.User;
 import io.vertx.ext.spring.annotation.*;
-import io.vertx.ext.web.LanguageHeader;
 import io.vertx.ext.web.Session;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.TypeMismatchException;
@@ -28,8 +30,7 @@ import io.vertx.ext.web.handler.BodyHandler;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.format.support.DefaultFormattingConversionService;
-import org.springframework.util.AntPathMatcher;
-import org.springframework.util.PathMatcher;
+import org.springframework.util.ClassUtils;
 
 public class RouterFactory implements ApplicationContextAware, FactoryBean<Router> {
 
@@ -130,6 +131,8 @@ public class RouterFactory implements ApplicationContextAware, FactoryBean<Route
             logger.debug(context.request().method().toString() + " " + context.request().uri());
 
             try {
+                Object methodReturnValue = null;
+
                 // get all the required properties by the method
                 if(method.getParameterCount() > 0) {
                     int argIndex = 0;
@@ -164,11 +167,23 @@ public class RouterFactory implements ApplicationContextAware, FactoryBean<Route
                             RouterParam routerParam = parameter.getAnnotation(RouterParam.class);
                             RouterPathVariable routerPathVariable = parameter.getAnnotation(RouterPathVariable.class);
                             RouterHeader routerHeader = parameter.getAnnotation(RouterHeader.class);
+                            RouterRequestBody routerRequestBody = parameter.getAnnotation(RouterRequestBody.class);
 
                             String paramName = paramNames[argIndex];
                             String paramValue = null;
 
-                            if(routerHeader != null) {
+                            if(routerRequestBody != null) {
+
+                                Buffer buffer = context.getBody();
+                                if(buffer != null) {
+                                    arg = Json.decodeValue(buffer, parameter.getType());
+                                }
+
+                                if(arg == null && routerRequestBody.required()) {
+                                    throwMissingRequiredParameterException(paramName);
+                                }
+
+                            } else if(routerHeader != null) {
                                 if(!routerHeader.name().isEmpty() || !routerHeader.value().isEmpty()) {
                                     if(!routerHeader.name().isEmpty()) {
                                         paramName = routerHeader.name();
@@ -230,9 +245,18 @@ public class RouterFactory implements ApplicationContextAware, FactoryBean<Route
                         args[argIndex++] = arg;
                     }
 
-                    method.invoke(handler, args);
+                    methodReturnValue = method.invoke(handler, args);
                 } else {
-                    method.invoke(handler);
+                    methodReturnValue = method.invoke(handler);
+                }
+
+                // deal with an automatic response
+                if(methodReturnValue != null) {
+                    if(methodReturnValue.getClass().isAssignableFrom(String.class) || ClassUtils.isPrimitiveOrWrapper(methodReturnValue.getClass())) {
+                        context.response().end( String.valueOf(methodReturnValue) );
+                    } else {
+                        context.response().end( Json.encodeToBuffer(methodReturnValue) );
+                    }
                 }
 
             } catch (Throwable e) {

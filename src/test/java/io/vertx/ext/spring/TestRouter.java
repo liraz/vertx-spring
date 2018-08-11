@@ -1,17 +1,15 @@
 package io.vertx.ext.spring;
 
 import io.vertx.core.http.HttpServerRequest;
-import io.vertx.ext.spring.annotation.RouterParam;
-import io.vertx.ext.spring.annotation.RouterPathVariable;
+import io.vertx.core.http.HttpServerResponse;
+import io.vertx.ext.spring.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Optional;
 
 import io.vertx.core.http.HttpMethod;
-import io.vertx.ext.spring.annotation.RouterHandler;
-import io.vertx.ext.spring.annotation.VertxRouter;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.redis.RedisClient;
 
@@ -24,10 +22,18 @@ public class TestRouter {
 
     @Autowired InMemoryCache testCache;
 
+    @RouterHandler(method = HttpMethod.POST, value = "/testJson")
+    public TestAnimal testPostJson(@RouterRequestBody TestJsonObject testJsonObject, HttpServerResponse response) {
+
+        List<TestAnimal> animals = testJsonObject.getAnimals();
+        TestAnimal dog = animals.get(1);
+
+        return dog;
+    }
+
     @RouterHandler(method = HttpMethod.GET, value = "/test")
-    public void testGet(RoutingContext context, String key) {
-        context.response()
-            .end(testCache.get(key));
+    public String testGet(RoutingContext context, String key) {
+        return testCache.get(key);
     }
 
     @RouterHandler(method = HttpMethod.PUT, value = "/test")
